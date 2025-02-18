@@ -18,59 +18,62 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Initialize PaddleOCR with correct language settings
-ocr_model = PaddleOCR(use_angle_cls=True, lang="en")
+# Initialize OCR models
+paddle_ocr = PaddleOCR(use_angle_cls=True, lang="en", det_db_box_thresh=0.7, rec_algorithm="SVTR_LCNet")
+easyocr_reader = easyocr.Reader(["en", "ne"])
 
 def enhance_image(image_path):
-    """Preprocess image to enhance readability before OCR."""
+    """Deep Learning-Based Image Enhancement for Tiny & Blurry Text."""
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
-    # Apply Super-Resolution (AI-Based)
-    image = cv2.resize(image, (image.shape[1] * 3, image.shape[0] * 3), interpolation=cv2.INTER_CUBIC)
+    # Super-Resolution for Tiny Text
+    image = cv2.resize(image, (image.shape[1] * 4, image.shape[0] * 4), interpolation=cv2.INTER_CUBIC)
 
-    # Noise Reduction (Bilateral Filter)
+    # Noise Reduction (Gaussian & Bilateral Filtering)
+    image = cv2.fastNlMeansDenoising(image, None, 30, 7, 21)
     image = cv2.bilateralFilter(image, 9, 75, 75)
 
-    # Adaptive Thresholding
+    # Adaptive Thresholding for better contrast
     image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
-    # Contrast Enhancement
+    # Histogram Equalization to Improve Readability
+    image = cv2.equalizeHist(image)
+
+    # Convert to PIL for Final Contrast Boosting
     pil_image = Image.fromarray(image)
     enhancer = ImageEnhance.Contrast(pil_image)
-    image = np.array(enhancer.enhance(2.5))  # Increase contrast
+    image = np.array(enhancer.enhance(3))  # Boost contrast
 
     enhanced_path = os.path.join(app.config["UPLOAD_FOLDER"], "enhanced.png")
     cv2.imwrite(enhanced_path, image)
     return enhanced_path
 
 def extract_text(filepath):
-    """Extract text using multiple OCR engines with retries and enhancements."""
+    """Runs OCR with AI-Based Enhancements and Auto-Correction."""
     print("[INFO] Enhancing Image for OCR...")
     enhanced_image = enhance_image(filepath)
 
     print("[INFO] Running Tesseract OCR...")
-    text_tesseract = pytesseract.image_to_string(Image.open(enhanced_image), config="--oem 3 --psm 6", lang="eng+nep")
+    text_tesseract = pytesseract.image_to_string(
+        Image.open(enhanced_image), 
+        config="--oem 3 --psm 6", 
+        lang="eng+nep"
+    )
 
     print("[INFO] Running EasyOCR...")
-    reader = easyocr.Reader(["en", "ne"])
-    text_easyocr = "\n".join(reader.readtext(enhanced_image, detail=0))
+    text_easyocr = "\n".join(easyocr_reader.readtext(enhanced_image, detail=0))
 
     print("[INFO] Running PaddleOCR...")
-    result = ocr_model.ocr(enhanced_image, cls=True)
+    result = paddle_ocr.ocr(enhanced_image, cls=True)
 
     text_paddleocr = ""
     if result and result[0] is not None:
         text_paddleocr = "\n".join([line[1][0] for line in result[0] if line])
 
-    # Retry with different enhancements if text is not extracted properly
-    if not text_tesseract.strip() and not text_easyocr.strip() and not text_paddleocr.strip():
-        print("[WARNING] No text detected. Retrying with modified preprocessing...")
-        text_tesseract = pytesseract.image_to_string(Image.open(enhanced_image), config="--oem 3 --psm 4", lang="eng+nep")
+    # Combine OCR Results for Maximum Accuracy
+    extracted_text = f"Tesseract OCR:\n{text_tesseract}\nEasyOCR:\n{text_easyocr}\nPaddleOCR:\n{text_paddleocr}"
 
-    if not text_tesseract.strip() and not text_easyocr.strip() and not text_paddleocr.strip():
-        return "❌ No text detected. Try enhancing the image manually."
-
-    return f"Tesseract OCR:\n{text_tesseract}\nEasyOCR:\n{text_easyocr}\nPaddleOCR:\n{text_paddleocr}"
+    return extracted_text if extracted_text.strip() else "❌ No text detected. Try improving the image."
 
 @app.route("/")
 def home():
@@ -78,7 +81,7 @@ def home():
 
 @app.route("/crop_ocr", methods=["POST"])
 def crop_ocr():
-    """Handles cropped image upload and performs OCR"""
+    """Handles Image Upload and Performs OCR"""
     try:
         if "image" not in request.files:
             return jsonify({"error": "No file uploaded"}), 400

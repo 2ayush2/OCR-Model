@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultText = document.getElementById('result');
     let cropper;
 
+    // Initialize FilePond for better file upload handling
     const pond = FilePond.create(inputElement);
 
     pond.on('addfile', (error, file) => {
