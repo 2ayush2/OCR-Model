@@ -2,11 +2,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputElement = document.getElementById('fileInput');
     const previewImage = document.getElementById('preview');
     const processButton = document.getElementById('processButton');
-    const liveOCRText = document.getElementById('liveOCR');
     const resultText = document.getElementById('result');
     let cropper;
 
-    // Initialize FilePond for File Upload UI
     const pond = FilePond.create(inputElement);
 
     pond.on('addfile', (error, file) => {
@@ -24,7 +22,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 cropper.destroy();
             }
 
-            // Initialize Cropper.js
             cropper = new Cropper(previewImage, {
                 viewMode: 2,
                 autoCropArea: 1,
@@ -40,7 +37,6 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.readAsDataURL(file.file);
     });
 
-    // Send Cropped Image to Backend
     processButton.addEventListener('click', () => {
         if (!cropper) {
             alert("❌ Please select and crop an image first.");
@@ -65,11 +61,11 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(response => response.json())
             .then(data => {
-                resultText.innerText = "✅ Extracted Text:\n" + data.text;
+                resultText.innerHTML = `<p>✅ <b>Extracted Text:</b></p><pre>${data.text}</pre>`;
             })
             .catch(error => {
                 console.error('[ERROR] OCR extraction failed:', error);
-                resultText.innerText = "❌ OCR Failed!";
+                resultText.innerHTML = "❌ OCR Failed!";
             });
         });
     });
