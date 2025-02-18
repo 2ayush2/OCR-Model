@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Text Extractor (Multi-Language)</title>
+
+    <!-- Cropper.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    <!-- FilePond for Modern File Upload -->
+    <link rel="stylesheet" href="https://unpkg.com/filepond/dist/filepond.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Upload & Crop Image for OCR</h1>
+
+        <!-- File Upload -->
+        <input type="file" id="fileInput">
+
+        <!-- Image Preview -->
+        <div>
+            <img id="preview" style="display:none; max-width:100%;">
+        </div>
+
+        <!-- Processing Messages -->
+        <p id="liveOCR" style="color: blue;"></p>
+
+        <!-- Extract Text Button -->
+        <button id="processButton" style="display:none;">Extract Text</button>
+        
+        <!-- OCR Result -->
+        <div id="result"></div>
+    </div>
+
+    <!-- JS Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <script src="https://unpkg.com/filepond/dist/filepond.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

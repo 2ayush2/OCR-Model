@@ -1,0 +1,9 @@
+Flask
+flask-cors
+pytesseract
+opencv-python
+numpy
+Pillow
+easyocr
+paddleocr
+werkzeug
