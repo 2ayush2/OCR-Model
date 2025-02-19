@@ -5,39 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OCR Text Extractor (Multi-Language)</title>
 
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- Cropper.js -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    
     <!-- FilePond for Modern File Upload -->
     <link rel="stylesheet" href="https://unpkg.com/filepond/dist/filepond.min.css">
+
+    <!-- Quill.js (Text Editor for OCR Result) -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <div class="container">
-        <h1>Upload & Crop Image for OCR</h1>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-200 flex justify-center items-center min-h-screen p-4">
+
+    <div class="container bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 max-w-lg w-full">
+        <h1 class="text-2xl font-bold text-center mb-4">📄 Upload & Crop Image for OCR</h1>
 
         <!-- File Upload -->
-        <input type="file" id="fileInput">
+        <input type="file" id="fileInput" class="filepond w-full">
 
         <!-- Image Preview -->
-        <div>
-            <img id="preview" style="display:none; max-width:100%;">
+        <div class="mt-4 flex justify-center">
+            <img id="preview" class="hidden w-full max-w-xs rounded-lg shadow-md">
         </div>
 
-        <!-- Processing Messages -->
-        <p id="liveOCR" style="color: blue;"></p>
+        <!-- 🔹 Live OCR Progress Messages (Updates in Real-Time) -->
+        <div id="liveOCR" class="text-blue-500 text-center mt-3 font-semibold"></div>
+
+        <!-- 🔹 Progress Bar (Initially Hidden) -->
+        <div id="progressContainer" class="hidden w-full bg-gray-300 rounded-lg mt-2">
+            <div id="progressBar" class="bg-blue-500 text-xs font-medium text-white text-center p-1 rounded-lg w-0 transition-all duration-500">
+                0%
+            </div>
+        </div>
 
         <!-- Extract Text Button -->
-        <button id="processButton" style="display:none;">Extract Text</button>
-        
-        <!-- OCR Result -->
-        <div id="result"></div>
+        <button id="processButton" 
+            class="hidden mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+            🔍 Extract Text
+        </button>
+
+        <!-- OCR Result Editor -->
+        <div id="resultContainer" class="mt-4 hidden">
+            <p class="font-semibold">📝 Editable Extracted Text:</p>
+            <div id="editor" class="bg-gray-200 dark:bg-gray-700 p-4 rounded-lg min-h-[150px]"></div>
+
+            <!-- Copy Button -->
+            <button id="copyButton" 
+                class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                📋 Copy Text
+            </button>
+        </div>
     </div>
 
     <!-- JS Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <script src="https://unpkg.com/filepond/dist/filepond.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
+
+    <!-- Quill.js (Text Editor) -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+
+    <!-- Custom JS -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+
 </body>
 </html>
