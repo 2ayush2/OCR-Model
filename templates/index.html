@@ -29,7 +29,9 @@
         <input type="file" id="fileInput" class="filepond w-full">
 
         <!-- Image Preview -->
-        <div class="mt-4 flex justify-center">
+     <!-- Real-Time Enhanced Image Preview -->
+        <div>
+            <h3>📷 Original vs Enhanced Image</h3>
             <img id="preview" class="hidden w-full max-w-xs rounded-lg shadow-md">
         </div>
 
@@ -72,6 +74,8 @@
 
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script async src="https://docs.opencv.org/4.5.1/opencv.js"></script>
+
 
 </body>
 </html>

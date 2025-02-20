@@ -3,9 +3,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewImage = document.getElementById('preview');
     const processButton = document.getElementById('processButton');
     const resultContainer = document.getElementById('resultContainer');
+    const enhancedCanvas = document.createElement("canvas");
+
     const copyButton = document.getElementById('copyButton');
     const liveOCR = document.getElementById('liveOCR');
     let isProcessing=false;
+    let originalImage = null;
+
 
     // Progress Bar
     const progressContainer = document.getElementById("progressContainer");
@@ -20,6 +24,84 @@ document.addEventListener('DOMContentLoaded', function () {
         allowFileSizeValidation: true,
         maxFileSize: '5MB',
     });
+    fileInput.addEventListener("change", function (event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            originalImage = new Image();
+            originalImage.src = e.target.result;
+            originalImage.onload = function () {
+                previewImage.src = originalImage.src;
+                previewImage.style.display = "block";
+                
+                // Apply real-time enhancements
+                setTimeout(enhanceImageInBrowser, 500);
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+    function enhanceImageInBrowser() {
+        if (!originalImage) return;
+
+        // Create a canvas to draw the processed image
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = originalImage.width;
+        canvas.height = originalImage.height;
+        ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+        // Convert to grayscale
+        let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            data[i] = avg;  // Red
+            data[i + 1] = avg;  // Green
+            data[i + 2] = avg;  // Blue
+        }
+
+        // Apply contrast enhancement (CLAHE alternative)
+        let contrastFactor = 2.5;
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, data[i] * contrastFactor);
+            data[i + 1] = Math.min(255, data[i + 1] * contrastFactor);
+            data[i + 2] = Math.min(255, data[i + 2] * contrastFactor);
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+
+        // Show enhanced image in the preview
+        previewImage.src = canvas.toDataURL();
+        previewImage.style.display = "block";
+
+        // Allow user to send enhanced image for OCR
+        processButton.style.display = "inline-block";
+        processButton.addEventListener("click", function () {
+            uploadEnhancedImage(canvas);
+        });
+    }
+    function uploadEnhancedImage(canvas) {
+        canvas.toBlob((blob) => {
+            const formData = new FormData();
+            formData.append("image", blob, "enhanced.png");
+
+            fetch("/crop_ocr", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerHTML = `<p>✅ <b>Extracted Text:</b></p><pre>${data.text}</pre>`;
+            })
+            .catch(error => {
+                console.error("❌ OCR Extraction Failed:", error);
+                document.getElementById("result").innerHTML = "❌ OCR Failed!";
+            });
+        });
+    }
 
     pond.on('addfile', (error, file) => {
         if (error) {
