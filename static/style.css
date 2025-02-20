@@ -30,3 +30,8 @@ button {
 button:hover {
     background: #218838;
 }
+.filepond--root .filepond--credits {
+display: none !important;
+}
+
+ 
