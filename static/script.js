@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let progressInterval;
     let isNepaliEnabled = false; // Track language mode
     let nepalifyInstance = null; // To store Nepalify instance
-
+    let extractedText = ""; // Store extracted text
+    let scanningAnimation =null;
     // Initialize FilePond for better file upload handling
     const pond = FilePond.create(inputElement, {
         acceptedFileTypes: ['image/png', 'image/jpeg'],
@@ -134,8 +135,6 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.readAsDataURL(file.file);
     });
 
-   
-
     function startProgressPolling() {
         const liveOCR = document.getElementById("liveOCR");
         const progressBar = document.getElementById("progressBar");
@@ -159,6 +158,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function stopProgressPolling() {
         clearInterval(progressInterval);
+    }
+  // Initialize Quill Editor
+  var quill = new Quill('#editor', {
+    theme: 'snow',
+    placeholder: 'OCR extracted text will appear here...',
+    modules: {
+        toolbar: [
+            [{ 'header': [1, 2, false] }],
+            ['bold', 'italic', 'underline'],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            ['clean']
+        ]
+    }
+});
+// Apply necessary attributes to disable autocorrect, autocomplete, etc.
+document.querySelector('.ql-editor').setAttribute("autocomplete", "off");
+document.querySelector('.ql-editor').setAttribute("autocorrect", "off");
+document.querySelector('.ql-editor').setAttribute("autocapitalize", "off");
+document.querySelector('.ql-editor').setAttribute("spellcheck", "false");
+function insertExtractedText(text) {
+    console.log("📜 Extracted OCR Text:", text);
+    extractedText = text; // Store extracted text
+    quill.root.innerHTML = text;
+}
+function startScanningAnimation() {
+        scanEffect.style.display = "block"; // Show scanning effect
+        scanningAnimation = anime({
+            targets: '#scanEffect',
+            top: ["0%", "100%"],
+            easing: 'linear',
+            duration: 1500,
+            loop: true
+        });
+    }
+
+    function stopScanningAnimation() {
+        if (scanningAnimation) {
+            scanningAnimation.pause();
+            scanEffect.style.display = "none"; // Hide scanning effect
+        }
     }
 
     processButton.addEventListener("click", () => {
@@ -192,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append("image", blob, "cropped.png");
 
             startProgressPolling(); // Start live progress updates
+        startScanningAnimation(); // Start fake scanning effect
 
             fetch("/crop_ocr", {
                 method: "POST",
@@ -200,9 +240,10 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 stopProgressPolling(); // Stop progress updates
+            stopScanningAnimation(); // Stop scanning effect
 
                 if (data.text) {
-                    extractedTextArea.value = data.text; // Display OCR result in textarea
+                    insertExtractedText(data.text);
 
                     resultContainer.classList.remove("hidden");
                     liveOCR.innerHTML = "✅ OCR Completed!";
@@ -228,32 +269,58 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    toggleNepaliButton.addEventListener("click", function () {
-        const currentText = extractedTextArea.value;
+ // Enable Nepalify on Quill.js Correctly
 
+    // Enable Nepalify on Quill.js Correctly
+  // ✅ Fix: Enable continuous Nepali typing without extra clicks
+  function enableNepaliTyping() {
+    const editorElement = document.querySelector('.ql-editor');
+
+    editorElement.addEventListener('input', function (event) {
         if (isNepaliEnabled) {
-            if (nepalifyInstance) {
-                nepalifyInstance.disable();
+            let cursorPosition = quill.getSelection();
+            let text = editorElement.innerText;
+            let convertedText = nepalify.format(text, { layout: "romanized" });
+
+            // Preserve extracted OCR text
+            if (text.startsWith(extractedText)) {
+                convertedText = extractedText + convertedText.slice(extractedText.length);
             }
-            toggleNepaliButton.innerText = "Switch to Nepali 🏳";
-            extractedTextArea.style.backgroundColor = "white";
-            isNepaliEnabled = false;
-        } else {
-            initializeNepalify();
-            nepalifyInstance.enable();
-            toggleNepaliButton.innerText = "Switch to English 🇬🇧";
-            extractedTextArea.style.backgroundColor = "#ffdddd";
-            isNepaliEnabled = true;
+
+            quill.root.innerText = convertedText;
+            quill.setSelection(cursorPosition);
+            
+            // ✅ Fix: Keep focus inside the editor for continuous typing
+            setTimeout(() => {
+                quill.focus();
+            }, 50);
         }
-
-        extractedTextArea.value = currentText; // Preserve text
     });
+}
 
-    // Copy Button Functionality
-    copyButton.addEventListener("click", function () {
-        navigator.clipboard.writeText(extractedTextArea.value)
-            .then(() => alert('✅ Text Copied to Clipboard!'))
-            .catch(err => console.error('❌ Copy failed:', err));
-    });
+toggleNepaliButton.addEventListener("click", function () {
+    if (isNepaliEnabled) {
+        isNepaliEnabled = false;
+        toggleNepaliButton.innerText = "Switch to Nepali 🏳";
+        quill.root.style.backgroundColor = "white";
+    } else {
+        isNepaliEnabled = true;
+        toggleNepaliButton.innerText = "Switch to English 🇬🇧";
+        quill.root.style.backgroundColor = "#ffdddd";
+        enableNepaliTyping();
+    }
+
+    // ✅ Fix: Automatically focus Quill editor when switching to Nepali
+    setTimeout(() => {
+        quill.focus();
+    }, 100);
+});
+
+// Copy Button
+copyButton.addEventListener("click", function () {
+    navigator.clipboard.writeText(quill.root.innerText)
+        .then(() => alert('✅ Text Copied to Clipboard!'))
+        .catch(err => console.error('❌ Copy failed:', err));
+})
     
 });
