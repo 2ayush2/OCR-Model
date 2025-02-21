@@ -1,1 +1,10 @@
-flask flask-cors pytesseract easyocr paddleocr opencv-python numpy pillow werkzeug
+Flask
+Flask-Cors
+Werkzeug
+opencv-python
+numpy
+pillow
+easyocr
+paddleocr
+surya-ocr
+torch

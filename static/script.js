@@ -3,20 +3,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewImage = document.getElementById('preview');
     const processButton = document.getElementById('processButton');
     const resultContainer = document.getElementById('resultContainer');
-    const enhancedCanvas = document.createElement("canvas");
-
     const copyButton = document.getElementById('copyButton');
     const liveOCR = document.getElementById('liveOCR');
-    let isProcessing=false;
-    let originalImage = null;
-
-
-    // Progress Bar
     const progressContainer = document.getElementById("progressContainer");
     const progressBar = document.getElementById("progressBar");
+    const toggleNepaliButton = document.getElementById("toggleNepali"); // Toggle Button
+    const extractedTextArea = document.getElementById("extractedText");
 
+    let isProcessing = false;
+    let originalImage = null;
     let cropper;
     let progressInterval;
+    let isNepaliEnabled = false; // Track language mode
+    let nepalifyInstance = null; // To store Nepalify instance
 
     // Initialize FilePond for better file upload handling
     const pond = FilePond.create(inputElement, {
@@ -135,10 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.readAsDataURL(file.file);
     });
 
-    // Initialize Quill Editor
-    var quill = new Quill('#editor', {
-        theme: 'snow'
-    });
+   
 
     function startProgressPolling() {
         const liveOCR = document.getElementById("liveOCR");
@@ -206,7 +202,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 stopProgressPolling(); // Stop progress updates
 
                 if (data.text) {
-                    quill.root.innerHTML = data.text;
+                    extractedTextArea.value = data.text; // Display OCR result in textarea
+
                     resultContainer.classList.remove("hidden");
                     liveOCR.innerHTML = "✅ OCR Completed!";
                 } else {
@@ -225,9 +222,38 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    copyButton.addEventListener('click', function () {
-        navigator.clipboard.writeText(quill.root.innerText)
+    function initializeNepalify() {
+        if (!nepalifyInstance) {
+            nepalifyInstance = nepalify.interceptElementById("extractedText", { layout: "romanized" });
+        }
+    }
+
+    toggleNepaliButton.addEventListener("click", function () {
+        const currentText = extractedTextArea.value;
+
+        if (isNepaliEnabled) {
+            if (nepalifyInstance) {
+                nepalifyInstance.disable();
+            }
+            toggleNepaliButton.innerText = "Switch to Nepali 🏳";
+            extractedTextArea.style.backgroundColor = "white";
+            isNepaliEnabled = false;
+        } else {
+            initializeNepalify();
+            nepalifyInstance.enable();
+            toggleNepaliButton.innerText = "Switch to English 🇬🇧";
+            extractedTextArea.style.backgroundColor = "#ffdddd";
+            isNepaliEnabled = true;
+        }
+
+        extractedTextArea.value = currentText; // Preserve text
+    });
+
+    // Copy Button Functionality
+    copyButton.addEventListener("click", function () {
+        navigator.clipboard.writeText(extractedTextArea.value)
             .then(() => alert('✅ Text Copied to Clipboard!'))
             .catch(err => console.error('❌ Copy failed:', err));
     });
+    
 });
