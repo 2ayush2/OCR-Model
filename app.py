@@ -3,16 +3,13 @@ import cv2
 import numpy as np
 import time
 import threading
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template,Response, stream_with_context
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
-from PIL import Image
 import easyocr
 from paddleocr import PaddleOCR
-import torch
-from torchvision import transforms
-from torchvision.models import vgg19
-import tensorflow as tf
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
@@ -23,20 +20,28 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Initialize OCR Models
-paddle_ocr = PaddleOCR(use_angle_cls=True, lang="en", det_db_box_thresh=0.5, rec_algorithm="CRNN")
-easyocr_reader = easyocr.Reader(["en", "ne"])  # English + Nepali
+# Initialize OCR Models (Load only once)
+paddle_ocr = PaddleOCR(use_angle_cls=True, lang="en", det_db_box_thresh=0.5, rec_algorithm="CRNN", use_gpu=False)
+easyocr_reader = easyocr.Reader(["en", "ne"], gpu=False)  # English + Nepali
 
 # Global variable to store progress
-ocr_progress = {"status": "Idle", "progress": 0}
+ocr_progress = {
+    "status": "Idle",  # Current status of the OCR process
+    "progress": 0,     # Progress percentage (0-100)
+    "active_step": None,  # Current step being executed
+    "active_ocr": None,   # Active OCR engine (EasyOCR or PaddleOCR)
+}
 processing_lock = threading.Lock()
+
+# Thread pool for parallel execution
+executor = ThreadPoolExecutor(max_workers=4)
 
 
 def upscale_image(image):
     """Performs Super-Resolution using Deep Learning (ESRGAN)"""
     sr = cv2.dnn_superres.DnnSuperResImpl_create()
     model_path = "ESPCN_x4.pb"  # Ensure the file is correctly placed
-    sr.readModel("ESPCN_x4.pb")  # Downloaded model
+    sr.readModel(model_path)  # Downloaded model
     sr.setModel("espcn", 4)  # Using ESRGAN x4 upscale
     upscaled = sr.upsample(image)
     return upscaled
@@ -76,63 +81,17 @@ def preprocess_image(image_path):
     return enhanced_path
 
 
-def run_ocr(image_path, response_dict):
-    """Runs OCR on the cropped or full image and selects the most accurate output"""
-    global ocr_progress
+def run_easyocr(image_path):
+    """Run EasyOCR for Nepali + English"""
+    return easyocr_reader.readtext(image_path, detail=0)
 
-    try:
-        with processing_lock:
-            ocr_progress["status"] = "Processing Image..."
-            ocr_progress["progress"] = 10
-            enhanced_image_path = preprocess_image(image_path)
-            time.sleep(1)
 
-            easy_text, paddle_text = None, None
-
-            def run_easyocr():
-                """Run EasyOCR for Nepali + English"""
-                nonlocal easy_text
-                ocr_progress["status"] = "Running EasyOCR..."
-                ocr_progress["progress"] = 50
-                easy_text = easyocr_reader.readtext(enhanced_image_path, detail=0)
-
-            def run_paddleocr():
-                """Run PaddleOCR"""
-                nonlocal paddle_text
-                ocr_progress["status"] = "Running PaddleOCR..."
-                ocr_progress["progress"] = 80
-                result = paddle_ocr.ocr(enhanced_image_path, cls=True)
-                if result and result[0] is not None:
-                    paddle_text = [line[1][0] for line in result[0] if line]
-
-            # Run OCR in parallel
-            t1 = threading.Thread(target=run_easyocr)
-            t2 = threading.Thread(target=run_paddleocr)
-
-            t1.start()
-            t2.start()
-
-            t1.join()
-            t2.join()
-
-            # Selecting the best-structured text result
-            extracted_text = None
-            if easy_text and len(easy_text) > len(paddle_text or ""):
-                extracted_text = "\n".join(easy_text)
-            else:
-                extracted_text = "\n".join(paddle_text or [])
-
-            # Ensure proper formatting and remove unwanted numbers
-            extracted_text = filter_ocr_text(extracted_text)
-
-            response_dict["text"] = extracted_text
-            ocr_progress["status"] = "Completed ✅"
-            ocr_progress["progress"] = 100
-
-    except Exception as e:
-        response_dict["text"] = "❌ OCR Failed"
-        ocr_progress["status"] = f"Error: {str(e)}"
-        ocr_progress["progress"] = 0
+def run_paddleocr(image_path):
+    """Run PaddleOCR"""
+    result = paddle_ocr.ocr(image_path, cls=True)
+    if result and result[0] is not None:
+        return [line[1][0] for line in result[0] if line]
+    return []
 
 
 def filter_ocr_text(ocr_text):
@@ -154,13 +113,83 @@ def filter_ocr_text(ocr_text):
     return "\n".join(cleaned_text)
 
 
+async def run_ocr(image_path, response_dict):
+    """Runs OCR on the cropped or full image and selects the most accurate output"""
+    global ocr_progress
+
+    try:
+        with processing_lock:
+            # Step 1: Preprocessing
+            ocr_progress["status"] = "Preprocessing Image..."
+            ocr_progress["progress"] = 10
+            ocr_progress["active_step"] = "Preprocessing"
+            ocr_progress["active_ocr"] = None
+
+            # Preprocess image in a separate thread
+            enhanced_image_path = await asyncio.get_event_loop().run_in_executor(
+                executor, preprocess_image, image_path
+            )
+            time.sleep(1)
+
+            # Step 2: Running EasyOCR
+            ocr_progress["status"] = "Running EasyOCR..."
+            ocr_progress["progress"] = 30
+            ocr_progress["active_step"] = "Running OCR"
+            ocr_progress["active_ocr"] = "EasyOCR"
+
+            easy_text = await asyncio.get_event_loop().run_in_executor(
+                executor, run_easyocr, enhanced_image_path
+            )
+
+            # Step 3: Running PaddleOCR
+            ocr_progress["status"] = "Running PaddleOCR..."
+            ocr_progress["progress"] = 60
+            ocr_progress["active_step"] = "Running OCR"
+            ocr_progress["active_ocr"] = "PaddleOCR"
+
+            paddle_text = await asyncio.get_event_loop().run_in_executor(
+                executor, run_paddleocr, enhanced_image_path
+            )
+
+            # Step 4: Selecting the best result
+            ocr_progress["status"] = "Selecting Best OCR Result..."
+            ocr_progress["progress"] = 80
+            ocr_progress["active_step"] = "Postprocessing"
+            ocr_progress["active_ocr"] = None
+
+            # Selecting the best-structured text result
+            extracted_text = None
+            if easy_text and len(easy_text) > len(paddle_text or ""):
+                extracted_text = "\n".join(easy_text)
+            else:
+                extracted_text = "\n".join(paddle_text or [])
+
+            # Ensure proper formatting and remove unwanted numbers
+            extracted_text = filter_ocr_text(extracted_text)
+
+            response_dict["text"] = extracted_text
+
+            # Step 5: Completion
+            ocr_progress["status"] = "Completed ✅"
+            ocr_progress["progress"] = 100
+            ocr_progress["active_step"] = None
+            ocr_progress["active_ocr"] = None
+
+    except Exception as e:
+        response_dict["text"] = "❌ OCR Failed"
+        ocr_progress["status"] = f"Error: {str(e)}"
+        ocr_progress["progress"] = 0
+        ocr_progress["active_step"] = None
+        ocr_progress["active_ocr"] = None
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
 @app.route("/crop_ocr", methods=["POST"])
-def crop_ocr():
+async def crop_ocr():
     """Handles Cropped Image Upload and Performs OCR"""
     global ocr_progress
 
@@ -177,12 +206,12 @@ def crop_ocr():
 
     ocr_progress["status"] = "Starting OCR..."
     ocr_progress["progress"] = 5
+    ocr_progress["active_step"] = "Initializing"
+    ocr_progress["active_ocr"] = None
 
     # Run OCR in a separate thread
     response_dict = {"text": ""}
-    thread = threading.Thread(target=run_ocr, args=(filepath, response_dict))
-    thread.start()
-    thread.join()
+    await run_ocr(filepath, response_dict)
 
     return jsonify({"message": "OCR Completed", "text": response_dict["text"]})
 

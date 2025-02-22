@@ -275,7 +275,13 @@ function startScanningAnimation() {
   // ✅ Fix: Enable continuous Nepali typing without extra clicks
   function enableNepaliTyping() {
     const editorElement = document.querySelector('.ql-editor');
+   
+    
 
+    // ✅ Fix: Remove extra newlines before enabling Nepali typing
+    let text = editorElement.innerHTML.trim();
+    text = text.replace(/\n{2,}/g, '\n');  // Remove extra empty lines
+    quill.root.innerHTML = text;  // Update Quill editor
     editorElement.addEventListener('input', function (event) {
         if (isNepaliEnabled) {
             let cursorPosition = quill.getSelection();
@@ -286,6 +292,8 @@ function startScanningAnimation() {
             if (text.startsWith(extractedText)) {
                 convertedText = extractedText + convertedText.slice(extractedText.length);
             }
+                          // ✅ Prevent unnecessary line breaks
+                          convertedText = convertedText.replace(/\n{2,}/g, '\n');
 
             quill.root.innerText = convertedText;
             quill.setSelection(cursorPosition);
@@ -293,7 +301,14 @@ function startScanningAnimation() {
             // ✅ Fix: Keep focus inside the editor for continuous typing
             setTimeout(() => {
                 quill.focus();
-            }, 50);
+            }, 1);
+        }
+    });
+    editorElement.addEventListener('input', function () {
+        if (isNepaliEnabled) {
+            setTimeout(() => {
+                quill.focus();
+            }, 1);
         }
     });
 }
@@ -307,6 +322,7 @@ toggleNepaliButton.addEventListener("click", function () {
         isNepaliEnabled = true;
         toggleNepaliButton.innerText = "Switch to English 🇬🇧";
         quill.root.style.backgroundColor = "#ffdddd";
+        
         enableNepaliTyping();
     }
 

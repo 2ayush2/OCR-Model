@@ -13,6 +13,13 @@ body {
     width: 80%;
     max-width: 500px;
 }
+#ocrResult {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    text-align: left;
+}
+
 
 input {
     margin: 10px;

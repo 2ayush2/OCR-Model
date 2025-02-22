@@ -42,11 +42,18 @@
         <!-- Image Preview -->
         <div>
             <h3 class="text-lg font-semibold mt-4">📷 Image Preview</h3>
-<!-- Image Preview Container -->
-<div class="relative w-full max-w-xs mx-auto mt-3">
-    <img id="preview" class="hidden w-full rounded-lg shadow-md">
-    <div id="scanEffect" class="absolute top-0 left-0 w-full h-2 bg-green-400 opacity-75 hidden"></div>
-</div>        </div>
+            <!-- ✅ Image Preview with Scanning Effect -->
+            <div class="relative w-full max-w-xs mx-auto mt-3 shadow-lg border border-gray-300 rounded-lg">
+                <img id="preview" class="hidden w-full rounded-lg">
+                <div id="scanEffect" class="absolute top-0 left-0 w-full h-8 bg-green-500 opacity-75 hidden"></div>
+            </div>
+    
+            <!-- Lottie Animation Loader -->
+            <div id="lottieLoader" class="hidden flex justify-center mt-3">
+                <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_jtk9uzsk.json" 
+                    background="transparent" speed="1" style="width: 100px; height: 100px;" loop autoplay></lottie-player>
+            </div>
+        </div>
 
         <!-- Live OCR Progress Messages -->
         <div id="liveOCR" class="text-blue-500 text-center mt-3 font-semibold"></div>
@@ -75,7 +82,7 @@
             </button>
 
             <button id="copyButton" class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
-                📋 Copy Text
+                 Copy Text
             </button>
         </div>
     </div>
