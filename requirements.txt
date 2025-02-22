@@ -1,10 +1,33 @@
+# Flask and related dependencies
 Flask
 Flask-Cors
 Werkzeug
+
+# Image Processing
 opencv-python
 numpy
 pillow
+
+# OCR Libraries
 easyocr
 paddleocr
 surya-ocr
+pytesseract  # For Tesseract OCR (Ensure Tesseract is installed on system)
+
+# Machine Learning & Deep Learning
 torch
+torchvision
+tensorflow
+
+# Concurrency & Async Processing
+concurrent.futures
+asyncio
+threadpoolctl
+
+# Additional Utilities
+tqdm
+matplotlib
+scipy
+scikit-image
+scikit-learn
+requests
